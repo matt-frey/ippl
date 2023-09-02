@@ -210,7 +210,7 @@ namespace ippl {
 
             auto buf = Comm->getBuffer<MemorySpace>(IPPL_PARTICLE_SEND + sendNum, bufSize);
 
-            Comm->isend(rank, tag++, *buf, requests.back(), nSends);
+            Comm->isend(rank, tag++, *this, *buf, requests.back(), nSends);
             buf->resetWritePos();
         });
     }
@@ -226,7 +226,7 @@ namespace ippl {
 
             auto buf = Comm->getBuffer<MemorySpace>(IPPL_PARTICLE_RECV + recvNum, bufSize);
 
-            Comm->recv(rank, tag++, *buf, bufSize, nRecvs);
+            Comm->recv(rank, tag++, *this, *buf, bufSize, nRecvs);
             buf->resetReadPos();
         });
         unpack(nRecvs);
