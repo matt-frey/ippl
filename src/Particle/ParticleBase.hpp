@@ -24,7 +24,6 @@ namespace ippl {
     void ParticleBase<IP...>::addAttribute(detail::ParticleAttribBase<MemorySpace>& pa) {
         attributes_m.template get<MemorySpace>().push_back(&pa);
         pa.setParticleCount(localNum_m);
-        buffer_m.template get<MemorySpace>().push_back(std::make_shared<ParticleAttrib<char, MemorySpace> >());
     }
 
     template <typename... IP>
@@ -211,7 +210,7 @@ namespace ippl {
 
             auto buf = Comm->getBuffer<MemorySpace>(IPPL_PARTICLE_SEND + sendNum, bufSize);
 
-            Comm->isend(rank, tag++, buffer, *buf, requests.back(), nSends);
+            Comm->isend(rank, tag++, *buf, requests.back(), nSends);
             buf->resetWritePos();
         });
     }
@@ -227,10 +226,10 @@ namespace ippl {
 
             auto buf = Comm->getBuffer<MemorySpace>(IPPL_PARTICLE_RECV + recvNum, bufSize);
 
-            Comm->recv(rank, tag++, buffer, *buf, bufSize, nRecvs);
+            Comm->recv(rank, tag++, *buf, bufSize, nRecvs);
             buf->resetReadPos();
         });
-        unpack(buffer, nRecvs);
+        unpack(nRecvs);
     }
 
     template <typename... IP>
@@ -265,9 +264,8 @@ namespace ippl {
     void ParticleBase<IP...>::pack(const hash_container_type& hash) {
         detail::runForAllSpaces([&]<typename MemorySpace>() {
             auto& att = attributes_m.template get<MemorySpace>();
-            auto& buf = buffer_m.template get<MemorySpace>();
             for (unsigned j = 0; j < att.size(); j++) {
-                att[j]->pack(buf[j], hash.template get<MemorySpace>());
+                att[j]->pack(hash.template get<MemorySpace>());
             }
         });
     }
@@ -276,9 +274,8 @@ namespace ippl {
     void ParticleBase<IP...>::unpack(size_type nrecvs) {
         detail::runForAllSpaces([&]<typename MemorySpace>() {
             auto& att = attributes_m.template get<MemorySpace>();
-            auto& buf = buffer_m.template get<MemorySpace>();
             for (unsigned j = 0; j < att.size(); j++) {
-                att[j]->unpack(buf[j], nrecvs);
+                att[j]->unpack(nrecvs);
             }
         });
         localNum_m += nrecvs;

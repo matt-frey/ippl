@@ -86,12 +86,6 @@ namespace ippl {
         using attribute_container_type =
             typename detail::ContainerForAllSpaces<container_type>::type;
 
-        template <typename MemorySpace>
-        using buffer_type = std::vector<std::shared_ptr<attribute_type<MemorySpace> > >;
-
-        using buffer_container_type =
-            typename detail::ContainerForAllSpaces<buffer_type>::type;
-
         using hash_container_type = typename detail::ContainerForAllSpaces<detail::hash_type>::type;
 
         using size_type = detail::size_type;
@@ -284,9 +278,6 @@ namespace ippl {
 
         //! all attributes
         attribute_container_type attributes_m;
-
-        //! all attributes as buffers
-        buffer_container_type buffer_m;
 
         //! next unique particle ID
         index_type nextID_m;
