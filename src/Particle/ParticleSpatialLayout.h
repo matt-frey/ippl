@@ -36,20 +36,20 @@ namespace ippl {
      * @tparam Dim dimension
      * @tparam Mesh type
      */
-    template <typename T, unsigned Dim, class Mesh, typename... PositionProperties>
+    template <typename T, unsigned Dim, class Mesh>
     class ParticleSpatialLayout : public ParticleLayout {
     public:
-        using particle_position_type   = ParticleAttrib<T, PositionProperties...>;
-        using position_memory_space    = typename particle_position_type::memory_space;
-        using position_execution_space = typename particle_position_type::execution_space;
+//         using particle_position_type   = ParticleAttrib<T, PositionProperties...>;
+//         using position_memory_space    = typename particle_position_type::memory_space;
+//         using position_execution_space = typename particle_position_type::execution_space;
 
-        using hash_type   = detail::hash_type<position_memory_space>;
-        using locate_type = typename detail::ViewType<int, 1, position_memory_space>::view_type;
-        using bool_type   = typename detail::ViewType<bool, 1, position_memory_space>::view_type;
+//         using hash_type   = detail::hash_type<position_memory_space>;
+//         using locate_type = typename detail::ViewType<int, 1, position_memory_space>::view_type;
+//         using bool_type   = typename detail::ViewType<bool, 1, position_memory_space>::view_type;
 
         using position_type = T;
         using RegionLayout_t =
-            typename detail::RegionLayout<T, Dim, Mesh, position_memory_space>::uniform_type;
+            typename detail::RegionLayout<T, Dim, Mesh, Kokkos::DefaultExecutionSpace::memory_space>::uniform_type;
 
         using size_type = detail::size_type;
 
@@ -63,9 +63,6 @@ namespace ippl {
         ~ParticleSpatialLayout() = default;
 
         void updateLayout(FieldLayout<Dim>&, Mesh&);
-
-        template <class BufferType>
-        void update(BufferType& pdata, BufferType& buffer);
 
     protected:
         //! The RegionLayout which determines where our particles go.
@@ -89,21 +86,9 @@ namespace ippl {
          * @return The total number of invalidated particles
          */
         template <typename ParticleBunch>
-        size_type locateParticles(const ParticleBunch& pdata, locate_type& ranks,
-                                  bool_type& invalid) const;
+        size_type locateParticles(const ParticleBunch* pdata, typename ParticleBunch::locate_type& ranks,
+                                  typename ParticleBunch::bool_type& invalid);
 
-        /*!
-         * @param rank we sent to
-         * @param ranks a container specifying where a particle at the i-th index should go.
-         * @param hash a mapping to fill the send buffer contiguously
-         */
-        void fillHash(int rank, const locate_type& ranks, hash_type& hash);
-
-        /*!
-         * @param rank we sent to
-         * @param ranks a container specifying where a particle at the i-th index should go.
-         */
-        size_t numberOfSends(int rank, const locate_type& ranks);
     };
 }  // namespace ippl
 

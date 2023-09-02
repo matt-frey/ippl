@@ -27,6 +27,12 @@ namespace ippl {
     }
 
     template <typename... IP>
+    void ParticleBase<IP...>::addPositionAttribute(detail::ParticleAttribBase<position_memory_space>& pa) {
+        attributes_m.template get<position_memory_space>().push_back(&pa);
+        positionIndex_m = attributes_m.template get<position_memory_space>().size();
+    }
+
+    template <typename... IP>
     void ParticleBase<IP...>::initialize(std::shared_ptr<ParticleLayout> layout) {
         layout_m = std::move(layout);
     }
@@ -259,6 +265,9 @@ namespace ippl {
         });
         return total;
     }
+
+    template <typename... IP>
+    void ParticleBase<IP...>::update() { layout_m->update(this); };
 
     template <typename... IP>
     void ParticleBase<IP...>::pack(const hash_container_type& hash) {

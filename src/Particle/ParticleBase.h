@@ -52,6 +52,8 @@
 #include <tuple>
 #include <type_traits>
 #include <vector>
+#include <memory>
+
 
 #include "Types/IpplTypes.h"
 
@@ -76,6 +78,12 @@ namespace ippl {
     public:
         using index_type             = std::int64_t;
         using particle_index_type    = ParticleAttrib<index_type, IDProperties...>;
+
+        using position_execution_space = Kokkos::DefaultExecutionSpace;
+        using position_memory_space = position_execution_space::memory_space;
+        using hash_type   = detail::hash_type<position_memory_space>;
+        using locate_type = typename detail::ViewType<int, 1, position_memory_space>::view_type;
+        using bool_type   = typename detail::ViewType<bool, 1, position_memory_space>::view_type;
 
         template <typename... Properties>
         using attribute_type = typename detail::ParticleAttribBase<Properties...>;
@@ -150,6 +158,8 @@ namespace ippl {
          */
         template <typename MemorySpace>
         void addAttribute(detail::ParticleAttribBase<MemorySpace>& pa);
+
+        void addPositionAttribute(detail::ParticleAttribBase<position_memory_space>& pa);
 
         /*!
          * Get particle attribute
@@ -255,6 +265,12 @@ namespace ippl {
         template <typename MemorySpace>
         size_type packedSize(const size_type count) const;
 
+        void update();
+
+        attribute_type<position_memory_space>* getPositionAttribute() {
+            return attributes_m.template get<position_memory_space>()[positionIndex_m];
+        }
+
     protected:
         /*!
          * Fill attributes of buffer.
@@ -288,6 +304,9 @@ namespace ippl {
         //! buffers for particle partitioning
         hash_container_type deleteIndex_m;
         hash_container_type keepIndex_m;
+
+        // index of position attribute in attributes_m container
+        int positionIndex_m;
     };
 }  // namespace ippl
 

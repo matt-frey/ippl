@@ -31,62 +31,56 @@
 #ifndef IPPL_PARTICLE_LAYOUT_H
 #define IPPL_PARTICLE_LAYOUT_H
 
-#include <map>
-
-#include "Particle/ParticleAttrib.h"
-#include "Particle/ParticleBC.h"
+#include "Types/IpplTypes.h"
+#include "ParticleAttrib.h"
 
 namespace ippl {
-        // ParticleLayout class definition.  Template parameters are the type
-        // and dimension of the ParticlePos object used for the particles.
-//         template <typename T, unsigned Dim>
-        class ParticleLayout {
-        public:
-//             typedef T value_type;
+    /*!
+     * ParticleLayout class definition.
+     */
+    class ParticleLayout {
+    public:
+        using size_type = detail::size_type;
 
-//             using particle_position_type   = ParticleAttrib<vector_type, PositionProperties...>;
-//             using position_memory_space    = typename particle_position_type::memory_space;
-//             using position_execution_space = typename particle_position_type::execution_space;
+    public:
+        // constructor: this one also takes a Mesh
+        ParticleLayout() = default;
 
-//             typedef std::array<BC, 2 * Dim> bc_container_type;
+        ~ParticleLayout() = default;
 
-//             static constexpr unsigned dim = Dim;
+        template <class ParticleContainer>
+        void update(ParticleContainer* pc);
 
-        public:
-            ParticleLayout() { /*bcs_m.fill(BC::NO);*/ };
+        /*!
+         * For each particle in the bunch, determine the rank on which it should
+         * be stored based on its location
+         * @param pdata the particle bunch
+         * @param ranks the integer view in which to store the destination ranks
+         * @param invalid the boolean view in which to store whether each particle
+         * is invalidated, i.e. needs to be sent to another rank
+         * @return The total number of invalidated particles
+         */
+        template <class ParticleContainer>
+        size_type locateParticles(const ParticleContainer* pc,
+                                  typename ParticleContainer::locate_type& ranks,
+                                  typename ParticleContainer::bool_type& invalid);
 
-            ~ParticleLayout() = default;
+        /*!
+         * @param rank we sent to
+         * @param ranks a container specifying where a particle at the i-th index should go.
+         * @param hash a mapping to fill the send buffer contiguously
+         */
+        template <class ParticleContainer>
+        void fillHash(int rank, const typename ParticleContainer::locate_type& ranks,
+                      typename ParticleContainer::hash_type & hash);
 
-            template <class PBase>
-            void update(PBase&) {
-                // FIXME
-                std::cout << "TODO" << std::endl;
-            }
-
-//             /*!
-//              * Copy over the given boundary conditions.
-//              * @param bcs are the boundary conditions
-//              */
-//             void setParticleBC(bc_container_type bcs) { bcs_m = bcs; }
-
-//             /*!
-//              * Use the same boundary condition on each face
-//              * @param bcs are the boundary conditions
-//              */
-//             void setParticleBC(BC bc) { bcs_m.fill(bc); }
-
-//             /*!
-//              * Apply the given boundary conditions to the current particle positions.
-//              * @tparam R is the particle position attribute
-//              * @tparam nr is the NDRegion
-//              * @param
-//              */
-//             void applyBC(const particle_position_type& R, const NDRegion<T, Dim>& nr);
-/*
-        private:
-            //! the list of boundary conditions for this set of particles
-            bc_container_type bcs_m;*/
-        };
+        /*!
+         * @param rank we sent to
+         * @param ranks a container specifying where a particle at the i-th index should go.
+         */
+        template <class ParticleContainer>
+        size_t numberOfSends(int rank, const typename ParticleContainer::locate_type& ranks);
+    };
 }  // namespace ippl
 
 #include "Particle/ParticleLayout.hpp"
