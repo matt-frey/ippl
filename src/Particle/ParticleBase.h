@@ -71,13 +71,15 @@ namespace ippl {
      * of the provided types is ippl::DisableParticleIDs, then particle
      * IDs will be disabled for the bunch)
      */
-    template <typename... IDProperties>
+    template <typename T, unsigned Dim, typename... IDProperties>
     class ParticleBase {
         constexpr static bool EnableIDs = sizeof...(IDProperties) > 0;
 
     public:
+        using position_type          = Vector<T, Dim>;
         using index_type             = std::int64_t;
         using particle_index_type    = ParticleAttrib<index_type, IDProperties...>;
+        using particle_position_type = ParticleAttrib<position_type>;
 
         using position_execution_space = Kokkos::DefaultExecutionSpace;
         using position_memory_space = position_execution_space::memory_space;
@@ -116,7 +118,7 @@ namespace ippl {
          * is null afterwards, i.e., layout == nullptr.
          * @param layout to be moved.
          */
-        ParticleBase(std::shared_ptr<ParticleLayout> layout);
+        ParticleBase(std::shared_ptr<ParticleLayout<T, Dim>> layout);
 
         /* cannot use '= default' since we get a
          * compiler warning otherwise:
@@ -133,7 +135,7 @@ namespace ippl {
          * when the ParticleBase instance is constructed with the
          * default ctor.
          */
-        void initialize(std::shared_ptr<ParticleLayout> layout);
+        void initialize(std::shared_ptr<ParticleLayout<T, Dim>> layout);
 
         /*!
          * @returns processor local number of particles
@@ -145,12 +147,12 @@ namespace ippl {
         /*!
          * @returns particle layout
          */
-        std::shared_ptr<ParticleLayout> getLayout() { return layout_m; }
+        std::shared_ptr<ParticleLayout<T, Dim>> getLayout() { return layout_m; }
 
         /*!
          * @returns particle layout
          */
-        const std::shared_ptr<ParticleLayout> getLayout() const { return layout_m; }
+        const std::shared_ptr<ParticleLayout<T, Dim>> getLayout() const { return layout_m; }
 
         /*!
          * Add particle attribute
@@ -159,7 +161,7 @@ namespace ippl {
         template <typename MemorySpace>
         void addAttribute(detail::ParticleAttribBase<MemorySpace>& pa);
 
-        void addPositionAttribute(detail::ParticleAttribBase<position_memory_space>& pa);
+        void addPositionAttribute(ParticleAttrib<position_type>& pa);
 
         /*!
          * Get particle attribute
@@ -267,8 +269,8 @@ namespace ippl {
 
         void update();
 
-        attribute_type<position_memory_space>* getPositionAttribute() {
-            return attributes_m.template get<position_memory_space>()[positionIndex_m];
+        ParticleAttrib<position_type>* getPositionAttribute() {
+            return pos_p;
         }
 
     protected:
@@ -285,9 +287,12 @@ namespace ippl {
         void unpack(size_type nrecvs);
 
     private:
+
+        particle_position_type* pos_p;
+
         //! particle layout
         // cannot use std::unique_ptr due to Kokkos
-        std::shared_ptr<ParticleLayout> layout_m;
+        std::shared_ptr<ParticleLayout<T, Dim>> layout_m;
 
         //! processor local number of particles
         size_type localNum_m;
@@ -304,9 +309,6 @@ namespace ippl {
         //! buffers for particle partitioning
         hash_container_type deleteIndex_m;
         hash_container_type keepIndex_m;
-
-        // index of position attribute in attributes_m container
-        int positionIndex_m;
     };
 }  // namespace ippl
 

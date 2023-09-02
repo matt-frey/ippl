@@ -6,8 +6,9 @@
 
 namespace ippl {
 
+    template <typename T, unsigned Dim>
     template <class ParticleContainer>
-    void ParticleLayout::update(ParticleContainer* pc) {
+    void ParticleLayout<T, Dim>::update(ParticleContainer* pc) {
 
 //         static IpplTimings::TimerRef ParticleBCTimer = IpplTimings::getTimer("particleBC");
 //         IpplTimings::startTimer(ParticleBCTimer);
@@ -38,14 +39,16 @@ namespace ippl {
         /* the values specify the rank where
          * the particle with that index should go
          */
-        typename ParticleContainer::locate_type ranks("MPI ranks", localnum);
+        locate_type ranks("MPI ranks", localnum);
 
         /* 0 --> particle valid
          * 1 --> particle invalid
          */
-        typename ParticleContainer::bool_type invalid("invalid", localnum);
+        bool_type invalid("invalid", localnum);
 
-        size_type invalidCount = locateParticles(pc, ranks, invalid);
+        auto* pos = pc->getPositionAttribute();
+
+        size_type invalidCount = locateParticles(pos, ranks, invalid);
         IpplTimings::stopTimer(locateTimer);
 
         // 2nd step
@@ -85,7 +88,7 @@ namespace ippl {
         int sends = 0;
         for (int rank = 0; rank < nRanks; ++rank) {
             if (nSends[rank] > 0) {
-                typename ParticleContainer::hash_type hash("hash", nSends[rank]);
+                hash_type hash("hash", nSends[rank]);
                 fillHash<ParticleContainer>(rank, ranks, hash);
 
                 pc->sendToRank(rank, tag, sends++, requests, hash);
@@ -122,48 +125,49 @@ namespace ippl {
         IpplTimings::stopTimer(ParticleUpdateTimer);
     }
 
-    template <class ParticleContainer>
-    ParticleLayout::size_type ParticleLayout::locateParticles(
-        const ParticleContainer* /*pc*/,
-        typename ParticleContainer::locate_type& /*ranks*/,
-        typename ParticleContainer::bool_type& /*invalid*/) {
-//         auto& positions                            = pc.getPositionAttribute().getView();
-//         typename RegionLayout_t::view_type Regions = rlayout_m.getdLocalRegions();
-//
-//         using mdrange_type = Kokkos::MDRangePolicy<Kokkos::Rank<2>, position_execution_space>;
-//
-//         int myRank = Comm->rank();
-//
-//         const auto is = std::make_index_sequence<Dim>{};
-//
-//         size_type invalidCount = 0;
-//         Kokkos::parallel_reduce(
-//             "ParticleLayout::locateParticles()",
-//             mdrange_type({0, 0}, {ranks.extent(0), Regions.extent(0)}),
-//             KOKKOS_LAMBDA(const size_t i, const size_type j, size_type& count) {
-//                 bool xyz_bool = positionInRegion(is, positions(i), Regions(j));
-//                 if (xyz_bool) {
-//                     ranks(i)   = j;
-//                     invalid(i) = (myRank != ranks(i));
-//                     count += invalid(i);
-//                 }
-//             },
-//             Kokkos::Sum<size_type>(invalidCount));
-//         Kokkos::fence();
-//
-//         return invalidCount;
-        std::cout << "Not implemented." << std::endl;
-        return 0;
-    }
+//     template <class ParticleContainer>
+//     ParticleLayout::size_type ParticleLayout::locateParticles(
+//         const ParticleContainer* /*pc*/,
+//         locate_type& /*ranks*/,
+//         bool_type& /*invalid*/) {
+// //         auto& positions                            = pc.getPositionAttribute().getView();
+// //         typename RegionLayout_t::view_type Regions = rlayout_m.getdLocalRegions();
+// //
+// //         using mdrange_type = Kokkos::MDRangePolicy<Kokkos::Rank<2>, position_execution_space>;
+// //
+// //         int myRank = Comm->rank();
+// //
+// //         const auto is = std::make_index_sequence<Dim>{};
+// //
+// //         size_type invalidCount = 0;
+// //         Kokkos::parallel_reduce(
+// //             "ParticleLayout::locateParticles()",
+// //             mdrange_type({0, 0}, {ranks.extent(0), Regions.extent(0)}),
+// //             KOKKOS_LAMBDA(const size_t i, const size_type j, size_type& count) {
+// //                 bool xyz_bool = positionInRegion(is, positions(i), Regions(j));
+// //                 if (xyz_bool) {
+// //                     ranks(i)   = j;
+// //                     invalid(i) = (myRank != ranks(i));
+// //                     count += invalid(i);
+// //                 }
+// //             },
+// //             Kokkos::Sum<size_type>(invalidCount));
+// //         Kokkos::fence();
+// //
+// //         return invalidCount;
+//         std::cout << "Not implemented." << std::endl;
+//         return 0;
+//     }
 
 
+    template <typename T, unsigned Dim>
     template <class ParticleContainer>
-    void ParticleLayout::fillHash(int rank,
-                                  const typename ParticleContainer::locate_type& ranks,
-                                  typename ParticleContainer::hash_type& hash) {
+    void ParticleLayout<T, Dim>::fillHash(int rank,
+                                  const locate_type& ranks,
+                                  hash_type& hash) {
         /* Compute the prefix sum and fill the hash
          */
-        using execution_space = ParticleContainer::position_execution_space;
+        using execution_space = position_execution_space;
         using policy_type = Kokkos::RangePolicy<execution_space>;
         Kokkos::parallel_scan(
             "ParticleLayout::fillHash()", policy_type(0, ranks.extent(0)),
@@ -182,11 +186,12 @@ namespace ippl {
     }
 
 
+    template <typename T, unsigned Dim>
     template <class ParticleContainer>
-    size_t ParticleLayout::numberOfSends(
-        int rank, const typename ParticleContainer::locate_type& ranks) {
+    size_t ParticleLayout<T, Dim>::numberOfSends(
+        int rank, const locate_type& ranks) {
         size_t nSends     = 0;
-        using execution_space = ParticleContainer::position_execution_space;
+        using execution_space = position_execution_space;
         using policy_type = Kokkos::RangePolicy<execution_space>;
         Kokkos::parallel_reduce(
             "ParticleLayout::numberOfSends()", policy_type(0, ranks.extent(0)),

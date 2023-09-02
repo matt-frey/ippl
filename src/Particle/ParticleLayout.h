@@ -38,8 +38,16 @@ namespace ippl {
     /*!
      * ParticleLayout class definition.
      */
+    template <typename T, unsigned Dim>
     class ParticleLayout {
     public:
+        using position_type = Vector<T, Dim>;
+        using position_execution_space = Kokkos::DefaultExecutionSpace;
+        using position_memory_space = position_execution_space::memory_space;
+        using hash_type   = detail::hash_type<position_memory_space>;
+        using locate_type = typename detail::ViewType<int, 1, position_memory_space>::view_type;
+        using bool_type   = typename detail::ViewType<bool, 1, position_memory_space>::view_type;
+
         using size_type = detail::size_type;
 
     public:
@@ -60,10 +68,9 @@ namespace ippl {
          * is invalidated, i.e. needs to be sent to another rank
          * @return The total number of invalidated particles
          */
-        template <class ParticleContainer>
-        size_type locateParticles(const ParticleContainer* pc,
-                                  typename ParticleContainer::locate_type& ranks,
-                                  typename ParticleContainer::bool_type& invalid);
+        virtual size_type locateParticles(const ParticleAttrib<position_type>* pos,
+                                  locate_type& ranks,
+                                  bool_type& invalid) = 0;
 
         /*!
          * @param rank we sent to
@@ -71,15 +78,15 @@ namespace ippl {
          * @param hash a mapping to fill the send buffer contiguously
          */
         template <class ParticleContainer>
-        void fillHash(int rank, const typename ParticleContainer::locate_type& ranks,
-                      typename ParticleContainer::hash_type & hash);
+        void fillHash(int rank, const locate_type& ranks,
+                      hash_type & hash);
 
         /*!
          * @param rank we sent to
          * @param ranks a container specifying where a particle at the i-th index should go.
          */
         template <class ParticleContainer>
-        size_t numberOfSends(int rank, const typename ParticleContainer::locate_type& ranks);
+        size_t numberOfSends(int rank, const locate_type& ranks);
     };
 }  // namespace ippl
 

@@ -37,17 +37,21 @@ namespace ippl {
      * @tparam Mesh type
      */
     template <typename T, unsigned Dim, class Mesh>
-    class ParticleSpatialLayout : public ParticleLayout {
+    class ParticleSpatialLayout : public ParticleLayout<T, Dim> {
     public:
 //         using particle_position_type   = ParticleAttrib<T, PositionProperties...>;
 //         using position_memory_space    = typename particle_position_type::memory_space;
-//         using position_execution_space = typename particle_position_type::execution_space;
+        using position_execution_space = typename ParticleLayout<T, Dim>::position_execution_space;
 
 //         using hash_type   = detail::hash_type<position_memory_space>;
 //         using locate_type = typename detail::ViewType<int, 1, position_memory_space>::view_type;
 //         using bool_type   = typename detail::ViewType<bool, 1, position_memory_space>::view_type;
 
-        using position_type = T;
+        using position_type = typename ParticleLayout<T, Dim>::position_type;
+        using hash_type   = typename ParticleLayout<T, Dim>::hash_type;
+        using locate_type = typename ParticleLayout<T, Dim>::locate_type;
+        using bool_type   = typename ParticleLayout<T, Dim>::bool_type;
+
         using RegionLayout_t =
             typename detail::RegionLayout<T, Dim, Mesh, Kokkos::DefaultExecutionSpace::memory_space>::uniform_type;
 
@@ -58,7 +62,7 @@ namespace ippl {
         ParticleSpatialLayout(FieldLayout<Dim>&, Mesh&);
 
         ParticleSpatialLayout()
-            : ParticleLayout() {}
+            : ParticleLayout<T, Dim>() {}
 
         ~ParticleSpatialLayout() = default;
 
@@ -85,9 +89,9 @@ namespace ippl {
          * is invalidated, i.e. needs to be sent to another rank
          * @return The total number of invalidated particles
          */
-        template <typename ParticleBunch>
-        size_type locateParticles(const ParticleBunch* pdata, typename ParticleBunch::locate_type& ranks,
-                                  typename ParticleBunch::bool_type& invalid);
+        virtual size_type locateParticles(const ParticleAttrib<position_type>* pos,
+                                          locate_type& ranks,
+                                          bool_type& invalid) override;
 
     };
 }  // namespace ippl

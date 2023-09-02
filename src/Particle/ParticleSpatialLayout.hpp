@@ -47,14 +47,13 @@ namespace ippl {
     };
 
     template <typename T, unsigned Dim, class Mesh>
-    template <typename ParticleBunch>
     detail::size_type ParticleSpatialLayout<T, Dim, Mesh>::locateParticles(
-        const ParticleBunch* pdata, typename ParticleBunch::locate_type& ranks,
-        typename ParticleBunch::bool_type& invalid) {
-        auto& positions                            = pdata.R.getView();
+        const ParticleAttrib<position_type>* pos, locate_type& ranks,
+        bool_type& invalid) {
+        auto& positions                            = pos->getView();
         typename RegionLayout_t::view_type Regions = rlayout_m.getdLocalRegions();
 
-        using mdrange_type = Kokkos::MDRangePolicy<Kokkos::Rank<2>, typename ParticleBunch::position_execution_space>;
+        using mdrange_type = Kokkos::MDRangePolicy<Kokkos::Rank<2>, position_execution_space>;
 
         int myRank = Comm->rank();
 
