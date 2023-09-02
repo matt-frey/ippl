@@ -1,53 +1,3 @@
-//
-// Class ParticleBase
-//   Base class for all user-defined particle classes.
-//
-//   ParticleBase is a container and manager for a set of particles.
-//   The user must define a class derived from ParticleBase which describes
-//   what specific data attributes the particle has (e.g., mass or charge).
-//   Each attribute is an instance of a ParticleAttribute<T> class; ParticleBase
-//   keeps a list of pointers to these attributes, and performs particle creation
-//   and destruction.
-//
-//   ParticleBase is templated on the ParticleLayout mechanism for the particles.
-//   This template parameter should be a class derived from ParticleLayout.
-//   ParticleLayout-derived classes maintain the info on which particles are
-//   located on which processor, and performs the specific communication
-//   required between processors for the particles.  The ParticleLayout is
-//   templated on the type and dimension of the atom position attribute, and
-//   ParticleBase uses the same types for these items as the given
-//   ParticleLayout.
-//
-//   ParticleBase and all derived classes have the following common
-//   characteristics:
-//       - The spatial positions of the N particles are stored in the
-//         particle_position_type variable R
-//       - The global index of the N particles are stored in the
-//         particle_index_type variable ID
-//       - A pointer to an allocated layout class.  When you construct a
-//         ParticleBase, you must provide a layout instance, and ParticleBase
-//         will delete this instance when it (the ParticleBase) is deleted.
-//
-//   To use this class, the user defines a derived class with the same
-//   structure as in this example:
-//
-//     class UserParticles :
-//              public ParticleBase< ParticleSpatialLayout<double,3> > {
-//     public:
-//       // attributes for this class
-//       ParticleAttribute<double> rad;  // radius
-//       particle_position_type    vel;  // velocity, same storage type as R
-//
-//       // constructor: add attributes to base class
-//       UserParticles(ParticleSpatialLayout<double,2>* L) : ParticleBase(L) {
-//         addAttribute(rad);
-//         addAttribute(vel);
-//       }
-//     };
-//
-//   This example defines a user class with 3D position and two extra
-//   attributes: a radius rad (double), and a velocity vel (a 3D Vector).
-//
 
 namespace ippl {
 
@@ -65,14 +15,16 @@ namespace ippl {
     template <typename... IP>
     ParticleBase<IP...>::ParticleBase(std::shared_ptr<ParticleLayout> layout)
         : ParticleBase()
-        , layout_m(std::move(layout))
-    { }
+    {
+        this->initialize(layout);
+    }
 
     template <typename... IP>
     template <typename MemorySpace>
     void ParticleBase<IP...>::addAttribute(detail::ParticleAttribBase<MemorySpace>& pa) {
         attributes_m.template get<MemorySpace>().push_back(&pa);
         pa.setParticleCount(localNum_m);
+        buffer_m.template get<MemorySpace>().push_back(std::make_shared<ParticleAttrib<char, MemorySpace> >());
     }
 
     template <typename... IP>
@@ -240,17 +192,17 @@ namespace ippl {
     }
 
     template <typename... IP>
-    template <typename HashType, typename BufferType>
+    template <typename HashType>
     void ParticleBase<IP...>::sendToRank(int rank, int tag, int sendNum,
                                                   std::vector<MPI_Request>& requests,
-                                                  const HashType& hash, BufferType& buffer) {
+                                                  const HashType& hash) {
         size_type nSends = hash.size();
         requests.resize(requests.size() + 1);
 
         auto hashes = hash_container_type(hash, [&]<typename MemorySpace>() {
             return attributes_m.template get<MemorySpace>().size() > 0;
         });
-        pack(buffer, hashes);
+        pack(hashes);
         detail::runForAllSpaces([&]<typename MemorySpace>() {
             size_type bufSize = packedSize<MemorySpace>(nSends);
             if (bufSize == 0) {
@@ -265,9 +217,8 @@ namespace ippl {
     }
 
     template <typename... IP>
-    template <typename BufferType>
     void ParticleBase<IP...>::recvFromRank(int rank, int tag, int recvNum,
-                                                    size_type nRecvs, BufferType& buffer) {
+                                                    size_type nRecvs) {
         detail::runForAllSpaces([&]<typename MemorySpace>() {
             size_type bufSize = packedSize<MemorySpace>(nRecvs);
             if (bufSize == 0) {
@@ -311,24 +262,23 @@ namespace ippl {
     }
 
     template <typename... IP>
-    template <class Buffer>
-    void ParticleBase<IP...>::pack(Buffer& buffer, const hash_container_type& hash) {
+    void ParticleBase<IP...>::pack(const hash_container_type& hash) {
         detail::runForAllSpaces([&]<typename MemorySpace>() {
             auto& att = attributes_m.template get<MemorySpace>();
+            auto& buf = buffer_m.template get<MemorySpace>();
             for (unsigned j = 0; j < att.size(); j++) {
-                att[j]->pack(buffer.template getAttribute<MemorySpace>(j),
-                             hash.template get<MemorySpace>());
+                att[j]->pack(buf[j], hash.template get<MemorySpace>());
             }
         });
     }
 
     template <typename... IP>
-    template <class Buffer>
-    void ParticleBase<IP...>::unpack(Buffer& buffer, size_type nrecvs) {
+    void ParticleBase<IP...>::unpack(size_type nrecvs) {
         detail::runForAllSpaces([&]<typename MemorySpace>() {
             auto& att = attributes_m.template get<MemorySpace>();
+            auto& buf = buffer_m.template get<MemorySpace>();
             for (unsigned j = 0; j < att.size(); j++) {
-                att[j]->unpack(buffer.template getAttribute<MemorySpace>(j), nrecvs);
+                att[j]->unpack(buf[j], nrecvs);
             }
         });
         localNum_m += nrecvs;

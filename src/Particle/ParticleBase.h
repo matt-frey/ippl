@@ -20,8 +20,6 @@
 //
 //   ParticleBase and all derived classes have the following common
 //   characteristics:
-//       - The spatial positions of the N particles are stored in the
-//         particle_position_type variable R
 //       - The global index of the N particles are stored in the
 //         particle_index_type variable ID
 //       - A pointer to an allocated layout class.  When you construct a
@@ -32,21 +30,21 @@
 //   structure as in this example:
 //
 //     class UserParticles :
-//              public ParticleBase< ParticleSpatialLayout<double,3> > {
+//              public ParticleBase {
 //     public:
 //       // attributes for this class
-//       ParticleAttribute<double> rad;  // radius
-//       particle_position_type    vel;  // velocity, same storage type as R
+//       ParticleAttribute<double> rad;              // radius
+//       ParticleAttribute<Vector<double, 3> > vel;  // velocity
 //
 //       // constructor: add attributes to base class
-//       UserParticles(ParticleSpatialLayout<double,2>* L) : ParticleBase(L) {
+//       UserParticles(std::shared_ptr<ParticleLayout> layout) : ParticleBase(layout) {
 //         addAttribute(rad);
 //         addAttribute(vel);
 //       }
 //     };
 //
-//   This example defines a user class with 3D position and two extra
-//   attributes: a radius rad (double), and a velocity vel (a 3D Vector).
+//   This example defines a user class with attributes:
+//   a radius rad (double), and a velocity vel (a 3D Vector).
 //
 #ifndef IPPL_PARTICLE_BASE_H
 #define IPPL_PARTICLE_BASE_H
@@ -88,7 +86,11 @@ namespace ippl {
         using attribute_container_type =
             typename detail::ContainerForAllSpaces<container_type>::type;
 
-//         using bc_container_type = typename PLayout::bc_container_type;
+        template <typename MemorySpace>
+        using buffer_type = std::vector<std::shared_ptr<attribute_type<MemorySpace> > >;
+
+        using buffer_container_type =
+            typename detail::ContainerForAllSpaces<buffer_type>::type;
 
         using hash_container_type = typename detail::ContainerForAllSpaces<detail::hash_type>::type;
 
@@ -147,18 +149,6 @@ namespace ippl {
          * @returns particle layout
          */
         const std::shared_ptr<ParticleLayout> getLayout() const { return layout_m; }
-
-//         /*!
-//          * Set all boundary conditions
-//          * @param bc the boundary conditions
-//          */
-//         void setParticleBC(const bc_container_type& bcs) { layout_m->setParticleBC(bcs); }
-
-//         /*!
-//          * Set all boundary conditions to this BC
-//          * @param bc the boundary conditions
-//          */
-//         void setParticleBC(BC bc) { layout_m->setParticleBC(bc); }
 
         /*!
          * Add particle attribute
@@ -242,12 +232,11 @@ namespace ippl {
         template <typename... Properties>
         void destroy(const Kokkos::View<bool*, Properties...>& invalid, const size_type destroyNum);
 
-        template <typename HashType, typename BufferType>
+        template <typename HashType>
         void sendToRank(int rank, int tag, int sendNum, std::vector<MPI_Request>& requests,
-                        const HashType& hash, BufferType& buffer);
+                        const HashType& hash);
 
-        template <typename BufferType>
-        void recvFromRank(int rank, int tag, int recvNum, size_type nRecvs, BufferType& buffer);
+        void recvFromRank(int rank, int tag, int recvNum, size_type nRecvs);
 
         /*!
          * Serialize to do MPI calls.
@@ -275,20 +264,15 @@ namespace ippl {
     protected:
         /*!
          * Fill attributes of buffer.
-         * @tparam Buffer is a bunch type
-         * @param buffer to send
          * @param hash function to access index.
          */
-        template <class Buffer>
-        void pack(Buffer& buffer, const hash_container_type& hash);
+        void pack(const hash_container_type& hash);
 
         /*!
          * Fill my attributes.
-         * @tparam Buffer is a bunch type
          * @param buffer received
          */
-        template <class Buffer>
-        void unpack(Buffer& buffer, size_type nrecvs);
+        void unpack(size_type nrecvs);
 
     private:
         //! particle layout
@@ -300,6 +284,9 @@ namespace ippl {
 
         //! all attributes
         attribute_container_type attributes_m;
+
+        //! all attributes as buffers
+        buffer_container_type buffer_m;
 
         //! next unique particle ID
         index_type nextID_m;
