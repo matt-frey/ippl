@@ -1,91 +1,109 @@
 //
 // Class ParticleLayout
-//   Base class for all particle layout classes.
+//   Particle layout based on spatial decomposition.
 //
-//   This class is used as the generic base class for all classes
-//   which maintain the information on where all the particles are located
-//   on a parallel machine.  It is responsible for performing particle
-//   load balancing.
+//   This is a specialized version of ParticleLayout, which places particles
+//   on processors based on their spatial location relative to a fixed grid.
+//   In particular, this can maintain particles on processors based on a
+//   specified FieldLayout or RegionLayout, so that particles are always on
+//   the same node as the node containing the Field region to which they are
+//   local.  This may also be used if there is no associated Field at all,
+//   in which case a grid is selected based on an even distribution of
+//   particles among processors.
 //
-//   If more general layout information is needed, such as the global -> local
-//   mapping for each particle, then derived classes must provide this info.
+//   After each 'time step' in a calculation, which is defined as a period
+//   in which the particle positions may change enough to affect the global
+//   layout, the user must call the 'update' routine, which will move
+//   particles between processors, etc.  After the Nth call to update, a
+//   load balancing routine will be called instead.  The user may set the
+//   frequency of load balancing (N), or may supply a function to
+//   determine if load balancing should be done or not.
 //
-//   When particles are created or destroyed, this class is also responsible
-//   for determining where particles are to be created, gathering this
-//   information, and recalculating the global indices of all the particles.
-//   For consistency, creation and destruction requests are cached, and then
-//   performed all in one step when the update routine is called.
-//
-//   Derived classes must provide the following:
-//     1) Specific version of update and loadBalance.  These are not virtual,
-//        as this class is used as a template parameter (instead of being
-//        assigned to a base class pointer).
-//     2) Internal storage to maintain their specific layout mechanism
-//     3) the definition of a class pair_iterator, and a function
-//        void getPairlist(int, pair_iterator&, pair_iterator&) to get a
-//        begin/end iterator pair to access the local neighbor of the Nth
-//        local atom.  This is not a virtual function, it is a requirement of
-//        the templated class for use in other parts of the code.
-//
-
 #ifndef IPPL_PARTICLE_LAYOUT_H
 #define IPPL_PARTICLE_LAYOUT_H
 
 #include "Types/IpplTypes.h"
-#include "ParticleAttrib.h"
+
+#include "FieldLayout/FieldLayout.h"
+#include "Particle/ParticleBase.h"
+#include "Region/RegionLayout.h"
 
 namespace ippl {
     /*!
      * ParticleLayout class definition.
+     * @tparam T value type
+     * @tparam Dim dimension
+     * @tparam Mesh type
      */
-    template <typename T, unsigned Dim>
+    template <typename T, unsigned Dim, class Mesh = UniformCartesian<T, Dim>,
+              typename... PositionProperties>
     class ParticleLayout {
     public:
-        using position_type = Vector<T, Dim>;
-        using position_execution_space = Kokkos::DefaultExecutionSpace;
-        using position_memory_space = position_execution_space::memory_space;
+        using Base = detail::ParticleLayout<T, Dim, PositionProperties...>;
+        using typename Base::position_memory_space, typename Base::position_execution_space;
+
         using hash_type   = detail::hash_type<position_memory_space>;
         using locate_type = typename detail::ViewType<int, 1, position_memory_space>::view_type;
         using bool_type   = typename detail::ViewType<bool, 1, position_memory_space>::view_type;
+
+        using vector_type = typename Base::vector_type;
+        using RegionLayout_t =
+            typename detail::RegionLayout<T, Dim, Mesh, position_memory_space>::uniform_type;
 
         using size_type = detail::size_type;
 
     public:
         // constructor: this one also takes a Mesh
-        ParticleLayout() = default;
+        ParticleLayout(FieldLayout<Dim>&, Mesh&);
+
+        ParticleLayout()
+            : detail::ParticleLayout<T, Dim, PositionProperties...>() {}
 
         ~ParticleLayout() = default;
 
-        template <class ParticleContainer>
-        void update(ParticleContainer* pc);
+        void updateLayout(FieldLayout<Dim>&, Mesh&);
 
+        template <class BufferType>
+        void update(BufferType& pdata, BufferType& buffer);
+
+        const RegionLayout_t& getRegionLayout() const { return rlayout_m; }
+
+    protected:
+        //! The RegionLayout which determines where our particles go.
+        RegionLayout_t rlayout_m;
+
+        using region_type = typename RegionLayout_t::view_type::value_type;
+
+        template <size_t... Idx>
+        KOKKOS_INLINE_FUNCTION constexpr static bool positionInRegion(
+            const std::index_sequence<Idx...>&, const vector_type& pos, const region_type& region);
+
+    public:
         /*!
          * For each particle in the bunch, determine the rank on which it should
          * be stored based on its location
+         * @tparam ParticleBunch the bunch type
          * @param pdata the particle bunch
          * @param ranks the integer view in which to store the destination ranks
          * @param invalid the boolean view in which to store whether each particle
          * is invalidated, i.e. needs to be sent to another rank
          * @return The total number of invalidated particles
          */
-        virtual size_type locateParticles(const ParticleAttrib<position_type>* pos,
-                                  locate_type& ranks,
-                                  bool_type& invalid) = 0;
+        template <typename ParticleBunch>
+        size_type locateParticles(const ParticleBunch& pdata, locate_type& ranks,
+                                  bool_type& invalid) const;
 
         /*!
          * @param rank we sent to
          * @param ranks a container specifying where a particle at the i-th index should go.
          * @param hash a mapping to fill the send buffer contiguously
          */
-        template <class ParticleContainer>
-        void fillHash(int rank, const locate_type& ranks,
-                      hash_type & hash);
+        void fillHash(int rank, const locate_type& ranks, hash_type& hash);
 
         /*!
          * @param rank we sent to
          * @param ranks a container specifying where a particle at the i-th index should go.
          */
-        template <class ParticleContainer>
         size_t numberOfSends(int rank, const locate_type& ranks);
     };
 }  // namespace ippl
