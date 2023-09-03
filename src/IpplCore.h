@@ -31,7 +31,7 @@
 #include "Types/Vector.h"
 
 #include "Particle/ParticleBase.h"
-#include "Particle/ParticleSpatialLayout.h"
+#include "Particle/ParticleLayout.h"
 
 // // IPPL Load balancing
 #include "Decomposition/OrthogonalRecursiveBisection.h"

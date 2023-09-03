@@ -14,7 +14,7 @@
 #include "Index/Index.h"
 #include "Index/NDIndex.h"
 #include "Particle/ParticleAttrib.h"
-#include "Particle/ParticleSpatialLayout.h"
+#include "Particle/ParticleLayout.h"
 #include "Region/NDRegion.h"
 
 namespace ippl {

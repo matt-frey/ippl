@@ -35,20 +35,11 @@ namespace ippl {
      * @tparam Dim dimension
      * @tparam Mesh type
      */
-    template <typename T, unsigned Dim, class Mesh = UniformCartesian<T, Dim>,
-              typename... PositionProperties>
+    template <typename T, unsigned Dim, class Mesh, class ExecutionSpace>
     class ParticleLayout {
     public:
-        using Base = detail::ParticleLayout<T, Dim, PositionProperties...>;
-        using typename Base::position_memory_space, typename Base::position_execution_space;
-
-        using hash_type   = detail::hash_type<position_memory_space>;
-        using locate_type = typename detail::ViewType<int, 1, position_memory_space>::view_type;
-        using bool_type   = typename detail::ViewType<bool, 1, position_memory_space>::view_type;
-
-        using vector_type = typename Base::vector_type;
         using RegionLayout_t =
-            typename detail::RegionLayout<T, Dim, Mesh, position_memory_space>::uniform_type;
+            typename detail::RegionLayout<T, Dim, Mesh, typename ExecutionSpace::memory_space>::uniform_type;
 
         using size_type = detail::size_type;
 
@@ -56,15 +47,14 @@ namespace ippl {
         // constructor: this one also takes a Mesh
         ParticleLayout(FieldLayout<Dim>&, Mesh&);
 
-        ParticleLayout()
-            : detail::ParticleLayout<T, Dim, PositionProperties...>() {}
+        ParticleLayout() = default;
 
         ~ParticleLayout() = default;
 
         void updateLayout(FieldLayout<Dim>&, Mesh&);
 
-        template <class BufferType>
-        void update(BufferType& pdata, BufferType& buffer);
+        template <class ParticleContainer>
+        void update(ParticleContainer* pc);
 
         const RegionLayout_t& getRegionLayout() const { return rlayout_m; }
 
@@ -76,35 +66,40 @@ namespace ippl {
 
         template <size_t... Idx>
         KOKKOS_INLINE_FUNCTION constexpr static bool positionInRegion(
-            const std::index_sequence<Idx...>&, const vector_type& pos, const region_type& region);
+            const std::index_sequence<Idx...>&, const Vector<T, Dim>& pos, const region_type& region);
 
     public:
         /*!
          * For each particle in the bunch, determine the rank on which it should
          * be stored based on its location
-         * @tparam ParticleBunch the bunch type
+         * @tparam ParticleContainer the particle container type
          * @param pdata the particle bunch
          * @param ranks the integer view in which to store the destination ranks
          * @param invalid the boolean view in which to store whether each particle
          * is invalidated, i.e. needs to be sent to another rank
          * @return The total number of invalidated particles
          */
-        template <typename ParticleBunch>
-        size_type locateParticles(const ParticleBunch& pdata, locate_type& ranks,
-                                  bool_type& invalid) const;
+        template <class ParticleContainer>
+        size_type locateParticles(const ParticleContainer* pc,
+                                  typename ParticleContainer::locate_type& ranks,
+                                  typename ParticleContainer::bool_type& invalid) const;
 
         /*!
          * @param rank we sent to
          * @param ranks a container specifying where a particle at the i-th index should go.
          * @param hash a mapping to fill the send buffer contiguously
          */
-        void fillHash(int rank, const locate_type& ranks, hash_type& hash);
+        template <class ParticleContainer>
+        void fillHash(int rank,
+                      const typename ParticleContainer::locate_type& ranks,
+                      typename ParticleContainer::hash_type& hash);
 
         /*!
          * @param rank we sent to
          * @param ranks a container specifying where a particle at the i-th index should go.
          */
-        size_t numberOfSends(int rank, const locate_type& ranks);
+        template <class ParticleContainer>
+        size_t numberOfSends(int rank, const typename ParticleContainer::locate_type& ranks);
     };
 }  // namespace ippl
 

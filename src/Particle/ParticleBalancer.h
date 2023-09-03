@@ -27,14 +27,14 @@
 
 // forward declarations
 template <class T, unsigned Dim, class Mesh, class CachingPolicy>
-class ParticleSpatialLayout;
+class ParticleLayout;
 template <class PLayout>
 class IpplParticleBase;
 
 // calculate a new RegionLayout for a given IpplParticleBase, and distribute the
 // new RegionLayout to all the nodes.  This uses a Field BinaryBalancer.
 template <class T, unsigned Dim, class Mesh, class CachingPolicy>
-bool BinaryRepartition(IpplParticleBase<ParticleSpatialLayout<T, Dim, Mesh, CachingPolicy> >&,
+bool BinaryRepartition(IpplParticleBase<ParticleLayout<T, Dim, Mesh, CachingPolicy> >&,
                        double = 0.0);
 
 #include "Particle/ParticleBalancer.hpp"

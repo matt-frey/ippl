@@ -60,13 +60,12 @@
 #include "Utility/TypeUtils.h"
 
 #include "Particle/ParticleLayout.h"
+#include "Particle/ParticleAttrib.h"
 
 namespace ippl {
 
     /*!
      * @class ParticleBase
-     * @tparam PLayout the particle layout implementing an algorithm to
-     * distribute the particles among MPI ranks
      * @tparam IDProperties the view properties for particle IDs (if any
      * of the provided types is ippl::DisableParticleIDs, then particle
      * IDs will be disabled for the bunch)
@@ -76,13 +75,14 @@ namespace ippl {
         constexpr static bool EnableIDs = sizeof...(IDProperties) > 0;
 
     public:
+        using position_execution_space = Kokkos::DefaultExecutionSpace;
+        using position_memory_space = position_execution_space::memory_space;
         using position_type          = Vector<T, Dim>;
         using index_type             = std::int64_t;
         using particle_index_type    = ParticleAttrib<index_type, IDProperties...>;
         using particle_position_type = ParticleAttrib<position_type>;
+        using particle_layout_type   = ParticleLayout<T, Dim position_execution_space>
 
-        using position_execution_space = Kokkos::DefaultExecutionSpace;
-        using position_memory_space = position_execution_space::memory_space;
         using hash_type   = detail::hash_type<position_memory_space>;
         using locate_type = typename detail::ViewType<int, 1, position_memory_space>::view_type;
         using bool_type   = typename detail::ViewType<bool, 1, position_memory_space>::view_type;
@@ -118,7 +118,7 @@ namespace ippl {
          * is null afterwards, i.e., layout == nullptr.
          * @param layout to be moved.
          */
-        ParticleBase(std::shared_ptr<ParticleLayout<T, Dim>> layout);
+        ParticleBase(std::shared_ptr<particle_layout_type> layout);
 
         /* cannot use '= default' since we get a
          * compiler warning otherwise:
@@ -135,7 +135,7 @@ namespace ippl {
          * when the ParticleBase instance is constructed with the
          * default ctor.
          */
-        void initialize(std::shared_ptr<ParticleLayout<T, Dim>> layout);
+        void initialize(std::shared_ptr<particle_layout_type> layout);
 
         /*!
          * @returns processor local number of particles
@@ -147,12 +147,12 @@ namespace ippl {
         /*!
          * @returns particle layout
          */
-        std::shared_ptr<ParticleLayout<T, Dim>> getLayout() { return layout_m; }
+        std::shared_ptr<particle_layout_type> getLayout() { return layout_m; }
 
         /*!
          * @returns particle layout
          */
-        const std::shared_ptr<ParticleLayout<T, Dim>> getLayout() const { return layout_m; }
+        const std::shared_ptr<particle_layout_type> getLayout() const { return layout_m; }
 
         /*!
          * Add particle attribute
@@ -292,7 +292,7 @@ namespace ippl {
 
         //! particle layout
         // cannot use std::unique_ptr due to Kokkos
-        std::shared_ptr<ParticleLayout<T, Dim>> layout_m;
+        std::shared_ptr<particle_layout_type> layout_m;
 
         //! processor local number of particles
         size_type localNum_m;

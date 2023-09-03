@@ -27,25 +27,30 @@
 
 namespace ippl {
 
-    template <typename T, unsigned Dim, class Mesh, typename... Properties>
-    ParticleLayout<T, Dim, Mesh, Properties...>::ParticleLayout(FieldLayout<Dim>& fl,
+    template <typename T, unsigned Dim, class Mesh, class ExecutionSpace>
+    ParticleLayout<T, Dim, Mesh, ExecutionSpace>::ParticleLayout(FieldLayout<Dim>& fl,
                                                                               Mesh& mesh)
         : rlayout_m(fl, mesh) {}
 
-    template <typename T, unsigned Dim, class Mesh, typename... Properties>
-    void ParticleLayout<T, Dim, Mesh, Properties...>::updateLayout(FieldLayout<Dim>& fl,
+    template <typename T, unsigned Dim, class Mesh, class ExecutionSpace>
+    void ParticleLayout<T, Dim, Mesh, ExecutionSpace>::updateLayout(FieldLayout<Dim>& fl,
                                                                           Mesh& mesh) {
         rlayout_m.changeDomain(fl, mesh);
     }
 
-    template <typename T, unsigned Dim, class Mesh, typename... Properties>
-    template <class BufferType>
-    void ParticleLayout<T, Dim, Mesh, Properties...>::update(BufferType& pdata,
-                                                                    BufferType& buffer) {
-        static IpplTimings::TimerRef ParticleBCTimer = IpplTimings::getTimer("particleBC");
-        IpplTimings::startTimer(ParticleBCTimer);
-        this->applyBC(pdata.R, rlayout_m.getDomain());
-        IpplTimings::stopTimer(ParticleBCTimer);
+    template <typename T, unsigned Dim, class Mesh, class ExecutionSpace>
+    template <class ParticleContainer>
+    void ParticleLayout<T, Dim, Mesh, ExecutionSpace>::update(ParticleContainer* pc) {
+
+        using locate_type = typename ParticleContainer::locate_type;
+        using bool_type = typename ParticleContainer::bool_type;
+        using hash_type = typename ParticleContainer::hash_type;
+
+
+//         static IpplTimings::TimerRef ParticleBCTimer = IpplTimings::getTimer("particleBC");
+//         IpplTimings::startTimer(ParticleBCTimer);
+//         this->applyBC(pdata.R, rlayout_m.getDomain());
+//         IpplTimings::stopTimer(ParticleBCTimer);
 
         static IpplTimings::TimerRef ParticleUpdateTimer = IpplTimings::getTimer("updateParticle");
         IpplTimings::startTimer(ParticleUpdateTimer);
@@ -64,7 +69,7 @@ namespace ippl {
 
         static IpplTimings::TimerRef locateTimer = IpplTimings::getTimer("locateParticles");
         IpplTimings::startTimer(locateTimer);
-        size_type localnum = pdata.getLocalNum();
+        size_type localnum = pc->getLocalNum();
 
         // 1st step
 
@@ -78,7 +83,7 @@ namespace ippl {
          */
         bool_type invalid("invalid", localnum);
 
-        size_type invalidCount = locateParticles(pdata, ranks, invalid);
+        size_type invalidCount = locateParticles(pc, ranks, invalid);
         IpplTimings::stopTimer(locateTimer);
 
         // 2nd step
@@ -121,7 +126,7 @@ namespace ippl {
                 hash_type hash("hash", nSends[rank]);
                 fillHash(rank, ranks, hash);
 
-                pdata.sendToRank(rank, tag, sends++, requests, hash, buffer);
+                pc->sendToRank(rank, tag, sends++, requests, hash);
             }
         }
         IpplTimings::stopTimer(sendTimer);
@@ -130,7 +135,7 @@ namespace ippl {
         static IpplTimings::TimerRef destroyTimer = IpplTimings::getTimer("particleDestroy");
         IpplTimings::startTimer(destroyTimer);
 
-        pdata.destroy(invalid, invalidCount);
+        pc->destroy(invalid, invalidCount);
         Kokkos::fence();
 
         IpplTimings::stopTimer(destroyTimer);
@@ -140,7 +145,7 @@ namespace ippl {
         int recvs = 0;
         for (int rank = 0; rank < nRanks; ++rank) {
             if (nRecvs[rank] > 0) {
-                pdata.recvFromRank(rank, tag, recvs++, nRecvs[rank], buffer);
+                pc->recvFromRank(rank, tag, recvs++, nRecvs[rank]);
             }
         }
         IpplTimings::stopTimer(recvTimer);
@@ -155,22 +160,23 @@ namespace ippl {
         IpplTimings::stopTimer(ParticleUpdateTimer);
     }
 
-    template <typename T, unsigned Dim, class Mesh, typename... Properties>
+    template <typename T, unsigned Dim, class Mesh, class ExecutionSpace>
     template <size_t... Idx>
     KOKKOS_INLINE_FUNCTION constexpr bool
-    ParticleLayout<T, Dim, Mesh, Properties...>::positionInRegion(
-        const std::index_sequence<Idx...>&, const vector_type& pos, const region_type& region) {
+    ParticleLayout<T, Dim, Mesh, ExecutionSpace>::positionInRegion(
+        const std::index_sequence<Idx...>&, const Vector<T, Dim>& pos, const region_type& region) {
         return ((pos[Idx] >= region[Idx].min()) && ...) && ((pos[Idx] <= region[Idx].max()) && ...);
     };
 
-    template <typename T, unsigned Dim, class Mesh, typename... Properties>
-    template <typename ParticleBunch>
-    detail::size_type ParticleLayout<T, Dim, Mesh, Properties...>::locateParticles(
-        const ParticleBunch& pdata, locate_type& ranks, bool_type& invalid) const {
-        auto& positions                            = pdata.R.getView();
+    template <typename T, unsigned Dim, class Mesh, class ExecutionSpace>
+    template <class ParticleContainer>
+    detail::size_type ParticleLayout<T, Dim, Mesh, ExecutionSpace>::locateParticles(
+        const ParticleContainer* pc, typename ParticleContainer::locate_type& ranks,
+        typename ParticleContainer::bool_type& invalid) const {
+        auto& positions                            = pc->R_p->getView();
         typename RegionLayout_t::view_type Regions = rlayout_m.getdLocalRegions();
 
-        using mdrange_type = Kokkos::MDRangePolicy<Kokkos::Rank<2>, position_execution_space>;
+        using mdrange_type = Kokkos::MDRangePolicy<Kokkos::Rank<2>, ExecutionSpace>;
 
         int myRank = Comm->rank();
 
@@ -194,13 +200,14 @@ namespace ippl {
         return invalidCount;
     }
 
-    template <typename T, unsigned Dim, class Mesh, typename... Properties>
-    void ParticleLayout<T, Dim, Mesh, Properties...>::fillHash(int rank,
-                                                                      const locate_type& ranks,
-                                                                      hash_type& hash) {
+    template <typename T, unsigned Dim, class Mesh, class ExecutionSpace>
+    template <class ParticleContainer>
+    void ParticleLayout<T, Dim, Mesh, ExecutionSpace>::fillHash(int rank,
+                                                                const typename ParticleContainer::locate_type& ranks,
+                                                                      typename ParticleContainer::hash_type& hash) {
         /* Compute the prefix sum and fill the hash
          */
-        using policy_type = Kokkos::RangePolicy<position_execution_space>;
+        using policy_type = Kokkos::RangePolicy<ExecutionSpace>;
         Kokkos::parallel_scan(
             "ParticleLayout::fillHash()", policy_type(0, ranks.extent(0)),
             KOKKOS_LAMBDA(const size_t i, int& idx, const bool final) {
@@ -217,11 +224,12 @@ namespace ippl {
         Kokkos::fence();
     }
 
-    template <typename T, unsigned Dim, class Mesh, typename... Properties>
-    size_t ParticleLayout<T, Dim, Mesh, Properties...>::numberOfSends(
-        int rank, const locate_type& ranks) {
+    template <typename T, unsigned Dim, class Mesh, class ExecutionSpace>
+    template <class ParticleContainer>
+    size_t ParticleLayout<T, Dim, Mesh, ExecutionSpace>::numberOfSends(
+        int rank, const typename ParticleContainer::locate_type& ranks) {
         size_t nSends     = 0;
-        using policy_type = Kokkos::RangePolicy<position_execution_space>;
+        using policy_type = Kokkos::RangePolicy<ExecutionSpace>;
         Kokkos::parallel_reduce(
             "ParticleLayout::numberOfSends()", policy_type(0, ranks.extent(0)),
             KOKKOS_LAMBDA(const size_t i, size_t& num) { num += size_t(rank == ranks(i)); },

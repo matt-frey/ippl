@@ -33,14 +33,14 @@
 #include "Particle/IpplParticleBase.h"
 #include "Particle/ParticleAttrib.h"
 #include "Particle/ParticleBalancer.h"
-#include "Particle/ParticleSpatialLayout.h"
+#include "Particle/ParticleLayout.h"
 #include "Region/RegionLayout.h"
 
 /////////////////////////////////////////////////////////////////////////////
 // calculate a new RegionLayout for a given ParticleBase, and distribute the
 // new RegionLayout to all the nodes.  This uses a Field BinaryBalancer.
 template <class T, unsigned Dim, class Mesh, class CachingPolicy>
-bool BinaryRepartition(IpplParticleBase<ParticleSpatialLayout<T, Dim, Mesh, CachingPolicy> >& PB,
+bool BinaryRepartition(IpplParticleBase<ParticleLayout<T, Dim, Mesh, CachingPolicy> >& PB,
                        double offset) {
     static IntNGP interp;  // to scatter particle density
 
