@@ -1,4 +1,5 @@
 {
+    "title": "Independent Parallel Particle Layer (IPPL)",
     "description": "IPPL is a C++ library to develop performance portable code for fully Eulerian, Lagrangian or hybrid Eulerian-Lagrangian methods.",
     "access_right": "open",
     "upload_type": "software",
@@ -12,30 +13,78 @@
       {
           "name": "Frey, Matthias",
           "orcid": "0000-0002-7842-0051",
+          "affiliation": "University of St Andrews"
+      },
+      {
+          "name": "Muralikrishnan, Sriramkrishnan",
+          "orcid": "0000-0002-5494-1880",
+          "affiliation": "Jülich Supercomputing Centre"
+      },
+      {
+          "name": "Adelmann, Andreas",
+          "orcid": "0000-0002-7230-7007",
+          "affiliation": "Paul Scherrer Institute"
+      },
+      {
+          "name": "Mayani, Sonali",
+          "orcid": "0000-0002-3294-4650",
+          "affiliation": "Paul Scherrer Institute"
+      },
+      {
+          "name": "Vinciguerra, Alessandro",
+          "affiliation": "ETH Zurich"
+      },
+      {
+          "name": "Montanaro, Veronica",
+          "affiliation": "ETH Zurich"
+      },
+      {
+          "name": "Sadr, Mohsen",
+          "orcid": "0000-0003-0241-8163",
+          "affiliation": "Paul Scherrer Institute",
+      },
+
+    ],
+    "contributors": [
+      {
+          "name": "Adelmann, Andreas",
+          "orcid": "0000-0002-7230-7007",
+          "affiliation": "Paul Scherrer Institute",
+          "type": "ProjectLeader"
+      },
+      {
+          "name": "Frey, Matthias",
+          "orcid": "0000-0002-7842-0051",
           "affiliation": "University of St Andrews",
+          "type": "ProjectManager"
       },
       {
           "name": "Muralikrishnan, Sriramkrishnan",
           "orcid": "0000-0002-5494-1880",
           "affiliation": "Jülich Supercomputing Centre",
-      },
-      {
-          "name": "Adelmann, Andreas",
-          "orcid": "0000-0002-7230-7007",
-          "affiliation": "Paul Scherrer Institute",
+          "type": "ProjectManager"
       },
       {
           "name": "Mayani, Sonali",
           "orcid": "0000-0002-3294-4650",
           "affiliation": "Paul Scherrer Institute",
+          "type": "ProjectMember"
       },
       {
           "name": "Vinciguerra, Alessandro",
           "affiliation": "ETH Zurich",
+          "type": "ProjectMember"
       },
       {
           "name": "Montanaro, Veronica",
           "affiliation": "ETH Zurich",
+          "type": "ProjectMember"
+      },
+      {
+          "name": "Sadr, Mohsen",
+          "orcid": "0000-0003-0241-8163",
+          "affiliation": "Paul Scherrer Institute",
+          "type": "ProjectMember"
       }
     ]
 }
